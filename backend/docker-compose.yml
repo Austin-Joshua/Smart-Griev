@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: smartgriev-postgres
+    environment:
+      POSTGRES_USER: smartgriev
+      POSTGRES_PASSWORD: smartgriev_secure_password
+      POSTGRES_DB: smartgriev_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartgriev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smartgriev-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: smartgriev-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smartgriev-network
+
+  # FastAPI Backend
+  backend:
+    build: .
+    container_name: smartgriev-api
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "False"
+      DATABASE_URL: postgresql://smartgriev:smartgriev_secure_password@postgres:5432/smartgriev_db
+      REDIS_URL: redis://redis:6379/0
+      BACKEND_CORS_ORIGINS: '["http://localhost:3000", "http://localhost:5173"]'
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+      - ./logs:/app/logs
+    networks:
+      - smartgriev-network
+    restart: unless-stopped
+
+  # Optional: PgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: smartgriev-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@smartgriev.com
+      PGADMIN_DEFAULT_PASSWORD: admin_password
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - smartgriev-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  smartgriev-network:
+    driver: bridge
