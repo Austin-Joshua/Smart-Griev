@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.core.logging import setup_logging
-from app.db.session import init_db
+# from app.db.session import init_db
 from app.api.v1 import api_router
 
 # Setup logging
@@ -20,10 +20,10 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Smart Griev API...")
     try:
-        init_db()
-        logger.info("Database initialized successfully")
+        # init_db()  # Database initialization - currently disabled
+        logger.info("Smart Griev API initialized successfully")
     except Exception as e:
-        logger.error(f"Failed to initialize database: {e}")
+        logger.error(f"Failed to initialize: {e}")
     
     yield
     

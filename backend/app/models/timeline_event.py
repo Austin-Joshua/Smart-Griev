@@ -1,6 +1,6 @@
 """Timeline event model for tracking grievance workflow history"""
 
-from sqlalchemy import Column, String, Enum, DateTime, Text, ForeignKey, Index
+from sqlalchemy import Column, String, Enum, DateTime, Text, ForeignKey, Index, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime
