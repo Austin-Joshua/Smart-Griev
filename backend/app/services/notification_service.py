@@ -133,24 +133,32 @@ Smart Griev System
             Success status
         """
         try:
-            # In production, use SendGrid or similar service
+            template = NotificationService.TEMPLATES.get(template_name)
+            if not template:
+                logger.error(f"Template {template_name} not found")
+                return False
+                
+            subject = template["subject"].format(**template_vars)
+            body = template["body"].format(**template_vars)
+            
             logger.info(f"Sending notification to {recipient_email} using template {template_name}")
             
-            if not settings.sendgrid_api_key:
+            if settings.sendgrid_api_key:
+                from app.services.email_service import EmailService
+                # Use HTML content if available, otherwise just text
+                # Ideally templates should support both, for now treating body as text/html
+                # Replacing newlines with <br> for simple text-to-html conversion if needed, 
+                # but better to have proper HTML templates. 
+                # For now, let's assume the body is plain text and wrap it or just send as is.
+                # The EmailService defaults to HTML, so let's format it slightly.
+                html_content = f"<pre style='font-family: sans-serif;'>{body}</pre>"
+                return EmailService.send_email(recipient_email, subject, html_content)
+            else:
                 logger.warning("SendGrid API key not configured")
-                # In development, just log
                 NotificationService._log_notification(
                     recipient_email, template_name, template_vars
                 )
                 return True
-            
-            # Implementation would use SendGrid SDK here
-            # This is a placeholder for production implementation
-            NotificationService._log_notification(
-                recipient_email, template_name, template_vars
-            )
-            
-            return True
             
         except Exception as e:
             logger.error(f"Error sending notification: {e}")

@@ -3,7 +3,7 @@ import { Footer } from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useGrievances } from "@/contexts/GrievanceContext";
+import { useGrievance } from "@/contexts/GrievanceContext";
 import { useState } from "react";
 import {
     BarChart,
@@ -32,11 +32,10 @@ import {
     FileText,
     CheckCircle2,
     AlertTriangle,
-    Clock,
     Building2,
 } from "lucide-react";
 
-// Mock trend data for the past 6 months
+// Mock trend data for the past 6 months (static for now)
 const monthlyTrends = [
     { month: "Aug", submitted: 45, resolved: 38, pending: 7 },
     { month: "Sep", submitted: 62, resolved: 55, pending: 14 },
@@ -75,13 +74,24 @@ const satisfactionData = [
 type StatModal = "total-submitted" | "total-resolved" | "resolution-rate" | "active-cases" | null;
 
 export default function Analytics() {
-    const { grievances } = useGrievances();
+    const { grievances } = useGrievance(); // Fixed hook name
     const [activeModal, setActiveModal] = useState<StatModal>(null);
 
     const totalSubmitted = monthlyTrends.reduce((s, m) => s + m.submitted, 0);
     const totalResolved = monthlyTrends.reduce((s, m) => s + m.resolved, 0);
     const resolutionRate = ((totalResolved / totalSubmitted) * 100).toFixed(1);
-    const activeCases = grievances.filter(g => g.status !== "resolved");
+
+    // Fixed case sensitivity for status
+    const activeCases = grievances.filter(g => g.status !== "Resolved");
+
+    // Helper to format date safely
+    const formatDate = (dateString: string) => {
+        try {
+            return new Date(dateString).toLocaleDateString();
+        } catch (e) {
+            return "Invalid Date";
+        }
+    };
 
     return (
         <div className="min-h-screen flex flex-col">
@@ -104,7 +114,7 @@ export default function Analytics() {
                         </Badge>
                     </div>
 
-                    {/* KPI Cards — ALL clickable */}
+                    {/* KPI Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <Card className="shadow-soft border-l-4 border-l-primary cursor-pointer hover:shadow-card transition-all" onClick={() => setActiveModal("total-submitted")}>
                             <CardContent className="pt-6">
@@ -142,7 +152,7 @@ export default function Analytics() {
                                 <p className="text-3xl font-bold font-heading mt-1">{activeCases.length}</p>
                                 <div className="flex items-center gap-1 mt-2 text-sm text-urgent">
                                     <TrendingDown className="w-4 h-4" />
-                                    <span>{grievances.filter(g => g.urgency === "high").length} high priority</span>
+                                    <span>{grievances.filter(g => g.urgency === "High").length} high priority</span>
                                 </div>
                             </CardContent>
                         </Card>
@@ -290,144 +300,6 @@ export default function Analytics() {
 
             {/* ════════════ DETAIL MODALS ════════════ */}
 
-            {/* Total Submitted */}
-            {activeModal === "total-submitted" && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in" onClick={(e) => e.target === e.currentTarget && setActiveModal(null)}>
-                    <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in">
-                        <CardHeader className="pb-4">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <CardTitle className="text-xl flex items-center gap-2"><FileText className="w-6 h-6 text-primary" />Total Submitted — Breakdown</CardTitle>
-                                    <p className="text-sm text-muted-foreground mt-1">{totalSubmitted} grievances submitted in the last 6 months</p>
-                                </div>
-                                <Button variant="ghost" size="icon" onClick={() => setActiveModal(null)}><X className="w-5 h-5" /></Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="space-y-3">
-                                <h3 className="font-semibold">Monthly Submissions</h3>
-                                {monthlyTrends.map((m) => (
-                                    <div key={m.month} className="p-3 rounded-lg bg-muted/30 flex items-center gap-3">
-                                        <span className="font-medium w-10">{m.month}</span>
-                                        <div className="flex-1 bg-muted rounded-full h-3">
-                                            <div className="h-3 rounded-full bg-primary" style={{ width: `${(m.submitted / 80) * 100}%` }}></div>
-                                        </div>
-                                        <span className="font-bold w-12 text-right">{m.submitted}</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="space-y-3">
-                                <h3 className="font-semibold">By Category</h3>
-                                {categoryBreakdown.map((c) => (
-                                    <div key={c.name} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-3 h-3 rounded-full" style={{ background: c.color }}></div>
-                                            <span className="font-medium">{c.name}</span>
-                                        </div>
-                                        <span className="font-bold">{c.value}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
-            {/* Total Resolved */}
-            {activeModal === "total-resolved" && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in" onClick={(e) => e.target === e.currentTarget && setActiveModal(null)}>
-                    <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in">
-                        <CardHeader className="pb-4">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <CardTitle className="text-xl flex items-center gap-2"><CheckCircle2 className="w-6 h-6 text-success" />Total Resolved — Breakdown</CardTitle>
-                                    <p className="text-sm text-muted-foreground mt-1">{totalResolved} grievances resolved in the last 6 months</p>
-                                </div>
-                                <Button variant="ghost" size="icon" onClick={() => setActiveModal(null)}><X className="w-5 h-5" /></Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="grid grid-cols-3 gap-3">
-                                <div className="text-center p-4 rounded-xl bg-success-light"><p className="text-2xl font-bold text-success">{totalResolved}</p><p className="text-xs text-muted-foreground">Resolved</p></div>
-                                <div className="text-center p-4 rounded-xl bg-muted"><p className="text-2xl font-bold">{resolutionRate}%</p><p className="text-xs text-muted-foreground">Rate</p></div>
-                                <div className="text-center p-4 rounded-xl bg-primary-light"><p className="text-2xl font-bold">+8%</p><p className="text-xs text-muted-foreground">vs Prior</p></div>
-                            </div>
-                            <div className="space-y-3">
-                                <h3 className="font-semibold">Monthly Resolution Performance</h3>
-                                {monthlyTrends.map((m) => (
-                                    <div key={m.month} className="p-3 rounded-lg bg-muted/30">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="font-semibold">{m.month}</span>
-                                            <div className="flex gap-3 text-sm">
-                                                <span className="text-success font-medium">{m.resolved} resolved</span>
-                                                <span className="text-muted-foreground">of {m.submitted} submitted</span>
-                                            </div>
-                                        </div>
-                                        <div className="w-full bg-muted rounded-full h-2">
-                                            <div className="h-2 rounded-full bg-success" style={{ width: `${(m.resolved / m.submitted) * 100}%` }}></div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
-            {/* Resolution Rate */}
-            {activeModal === "resolution-rate" && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in" onClick={(e) => e.target === e.currentTarget && setActiveModal(null)}>
-                    <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in">
-                        <CardHeader className="pb-4">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <CardTitle className="text-xl flex items-center gap-2"><Activity className="w-6 h-6 text-secondary" />Resolution Rate — Analysis</CardTitle>
-                                    <p className="text-sm text-muted-foreground mt-1">Current rate: {resolutionRate}% (Target: 95%)</p>
-                                </div>
-                                <Button variant="ghost" size="icon" onClick={() => setActiveModal(null)}><X className="w-5 h-5" /></Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="text-center p-6 rounded-2xl bg-secondary-light">
-                                <p className="text-5xl font-bold text-secondary">{resolutionRate}%</p>
-                                <p className="text-muted-foreground mt-1">Overall Resolution Rate</p>
-                                <div className="w-full bg-muted rounded-full h-4 mt-4">
-                                    <div className="h-4 rounded-full bg-secondary" style={{ width: `${parseFloat(resolutionRate)}%` }}></div>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-2">Target: 95%</p>
-                            </div>
-                            <div className="space-y-3">
-                                <h3 className="font-semibold">Monthly Resolution Rates</h3>
-                                {monthlyTrends.map((m) => {
-                                    const rate = ((m.resolved / m.submitted) * 100).toFixed(1);
-                                    return (
-                                        <div key={m.month} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                                            <span className="font-medium">{m.month}</span>
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-sm text-muted-foreground">{m.resolved}/{m.submitted}</span>
-                                                <Badge variant={parseFloat(rate) >= 90 ? "success" : parseFloat(rate) >= 80 ? "warning" : "urgent"}>{rate}%</Badge>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <div className="space-y-3">
-                                <h3 className="font-semibold">Resolution Time by Department</h3>
-                                {resolutionTime.sort((a, b) => a.days - b.days).map((r) => (
-                                    <div key={r.dept} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                                        <div className="flex items-center gap-3">
-                                            <Building2 className="w-5 h-5 text-secondary" />
-                                            <span className="font-medium">{r.dept}</span>
-                                        </div>
-                                        <span className={`font-bold ${r.days <= 2 ? "text-success" : r.days <= 3.5 ? "text-warning-foreground" : "text-urgent"}`}>{r.days} days</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
             {/* Active Cases */}
             {activeModal === "active-cases" && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in" onClick={(e) => e.target === e.currentTarget && setActiveModal(null)}>
@@ -444,25 +316,25 @@ export default function Analytics() {
                         <CardContent className="space-y-6">
                             <div className="grid grid-cols-3 gap-3">
                                 <div className="text-center p-4 rounded-xl bg-warning-light"><p className="text-2xl font-bold text-warning-foreground">{activeCases.length}</p><p className="text-xs text-muted-foreground">Active</p></div>
-                                <div className="text-center p-4 rounded-xl bg-urgent-light"><p className="text-2xl font-bold text-urgent">{grievances.filter(g => g.urgency === "high").length}</p><p className="text-xs text-muted-foreground">High Priority</p></div>
-                                <div className="text-center p-4 rounded-xl bg-success-light"><p className="text-2xl font-bold text-success">{grievances.filter(g => g.status === "resolved").length}</p><p className="text-xs text-muted-foreground">Resolved</p></div>
+                                <div className="text-center p-4 rounded-xl bg-urgent-light"><p className="text-2xl font-bold text-urgent">{grievances.filter(g => g.urgency === "High").length}</p><p className="text-xs text-muted-foreground">High Priority</p></div>
+                                <div className="text-center p-4 rounded-xl bg-success-light"><p className="text-2xl font-bold text-success">{grievances.filter(g => g.status === "Resolved").length}</p><p className="text-xs text-muted-foreground">Resolved</p></div>
                             </div>
                             <div className="space-y-3">
                                 <h3 className="font-semibold">Active Grievances</h3>
                                 {activeCases.map((g) => (
                                     <div key={g.id} className="p-4 rounded-xl border bg-muted/10">
                                         <div className="flex items-center justify-between mb-2">
-                                            <p className="font-semibold">{g.title}</p>
+                                            <p className="font-semibold">{g.category} Issue</p>
                                             <div className="flex gap-2">
-                                                <Badge variant={g.status === "review" ? "review" : g.status === "progress" ? "secondary" : "default"}>{g.status}</Badge>
-                                                <Badge variant={g.urgency === "high" ? "urgent" : g.urgency === "medium" ? "warning" : "success"}>{g.urgency}</Badge>
+                                                <Badge variant={g.status === "In Progress" ? "secondary" : "default"}>{g.status}</Badge>
+                                                <Badge variant={g.urgency === "High" ? "urgent" : g.urgency === "Medium" ? "warning" : "success"}>{g.urgency}</Badge>
                                             </div>
                                         </div>
                                         <p className="text-sm text-muted-foreground line-clamp-1">{g.description}</p>
                                         <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                                            <span>{g.id}</span>
-                                            <span>{g.department}</span>
-                                            <span>{g.submittedAt.toLocaleDateString()}</span>
+                                            <span>{g.id.slice(0, 8)}</span>
+                                            <span>{g.department_name}</span>
+                                            <span>{formatDate(g.created_at)}</span>
                                         </div>
                                     </div>
                                 ))}

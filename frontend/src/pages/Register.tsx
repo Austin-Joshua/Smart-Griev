@@ -1,215 +1,213 @@
 import { useState } from "react";
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Shield, UserPlus, Eye, EyeOff, ArrowRight } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+    CardFooter,
+} from "@/components/ui/card";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { AlertCircle, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { UserRole } from "@/types";
 
-export default function Register() {
-    const [fullName, setFullName] = useState("");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [role, setRole] = useState<string>("citizen");
-    const [showPassword, setShowPassword] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+const Register = () => {
     const navigate = useNavigate();
-    const { toast } = useToast();
-    const { login } = useAuth();
+    const { register } = useAuth();
+    const [formData, setFormData] = useState({
+        full_name: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+        role: "citizen" as UserRole,
+    });
+    const [error, setError] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError("");
 
-        if (!fullName.trim() || !email.trim() || !password.trim()) {
-            toast({
-                title: "Missing fields",
-                description: "Please fill in all required fields.",
-                variant: "destructive",
-            });
+        if (formData.password !== formData.confirmPassword) {
+            setError("Passwords do not match");
             return;
         }
 
-        if (password !== confirmPassword) {
-            toast({
-                title: "Passwords don't match",
-                description: "Please make sure both passwords are the same.",
-                variant: "destructive",
-            });
-            return;
-        }
-
-        if (password.length < 6) {
-            toast({
-                title: "Password too short",
-                description: "Password must be at least 6 characters long.",
-                variant: "destructive",
-            });
+        if (formData.password.length < 8) {
+            setError("Password must be at least 8 characters long");
             return;
         }
 
         setIsLoading(true);
-        await new Promise((resolve) => setTimeout(resolve, 1500));
 
-        login(
-            {
-                id: `usr-${Date.now()}`,
-                email,
-                fullName,
-                role: role as "citizen" | "officer" | "admin",
-                phone: "",
-                memberSince: new Date(),
-                isActive: true,
-            },
-            "mock-jwt-token"
-        );
+        try {
+            // Exclude confirmPassword from data sent to API
+            const { confirmPassword, ...registerData } = formData;
+            await register(registerData);
 
-        setIsLoading(false);
+            toast.success("Account created successfully. Please sign in.");
+            navigate("/login");
+        } catch (err: any) {
+            if (err.response?.data?.detail) {
+                setError(err.response.data.detail);
+            } else {
+                setError("Failed to create account. Please try again.");
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-        toast({
-            title: "Account created!",
-            description: "Welcome to SmartGriev. You can now submit and track grievances.",
-        });
-
-        navigate("/dashboard");
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData((prev) => ({
+            ...prev,
+            [e.target.id]: e.target.value,
+        }));
     };
 
     return (
-        <div className="min-h-screen flex flex-col">
-            <Header />
-
-            <main className="flex-1 container py-12 flex items-center justify-center">
-                <div className="w-full max-w-md space-y-8">
-                    <div className="text-center space-y-3">
-                        <div className="w-16 h-16 rounded-2xl hero-gradient flex items-center justify-center mx-auto shadow-soft">
-                            <Shield className="w-8 h-8 text-primary-foreground" />
-                        </div>
-                        <h1 className="font-heading text-3xl font-bold">Create Account</h1>
-                        <p className="text-muted-foreground">
-                            Join SmartGriev and make your voice heard
-                        </p>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 animate-fade-in">
+            <Card className="w-full max-w-md shadow-lg border-0 ring-1 ring-gray-200">
+                <CardHeader className="space-y-1 text-center">
+                    <div className="mx-auto bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mb-4">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                            stroke="currentColor"
+                            className="w-6 h-6 text-primary"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 019.374 21c-2.331 0-4.512-.645-6.374-1.766z"
+                            />
+                        </svg>
                     </div>
-
-                    <Card className="shadow-card">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <UserPlus className="w-5 h-5 text-primary" />
-                                Register
-                            </CardTitle>
-                            <CardDescription>
-                                Fill in your details to create a new account
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <form onSubmit={handleSubmit} className="space-y-5">
-                                <div className="space-y-2">
-                                    <Label htmlFor="fullName">Full Name *</Label>
-                                    <Input
-                                        id="fullName"
-                                        placeholder="Enter your full name"
-                                        value={fullName}
-                                        onChange={(e) => setFullName(e.target.value)}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">Email Address *</Label>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        placeholder="you@example.com"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        autoComplete="email"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="role">Account Type</Label>
-                                    <Select value={role} onValueChange={setRole}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select your role" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="citizen">Citizen</SelectItem>
-                                            <SelectItem value="officer">Government Officer</SelectItem>
-                                            <SelectItem value="admin">Administrator</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="password">Password *</Label>
-                                    <div className="relative">
-                                        <Input
-                                            id="password"
-                                            type={showPassword ? "text" : "password"}
-                                            placeholder="Min. 6 characters"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            autoComplete="new-password"
-                                        />
-                                        <button
-                                            type="button"
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                        >
-                                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="confirmPassword">Confirm Password *</Label>
-                                    <Input
-                                        id="confirmPassword"
-                                        type="password"
-                                        placeholder="Re-enter your password"
-                                        value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                        autoComplete="new-password"
-                                    />
-                                </div>
-
-                                <Button
-                                    type="submit"
-                                    variant="hero"
-                                    size="lg"
-                                    className="w-full"
-                                    disabled={isLoading}
-                                >
-                                    {isLoading ? (
-                                        <>
-                                            <UserPlus className="w-5 h-5 animate-spin" />
-                                            Creating account...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <UserPlus className="w-5 h-5" />
-                                            Create Account
-                                        </>
-                                    )}
-                                </Button>
-
-                                <div className="text-center text-sm text-muted-foreground">
-                                    Already have an account?{" "}
-                                    <Link to="/login" className="text-primary font-medium hover:underline">
-                                        Sign in
-                                        <ArrowRight className="w-3 h-3 inline ml-1" />
-                                    </Link>
-                                </div>
-                            </form>
-                        </CardContent>
-                    </Card>
-                </div>
-            </main>
-
-            <Footer />
+                    <CardTitle className="text-2xl font-bold tracking-tight text-gray-900">
+                        Create an account
+                    </CardTitle>
+                    <CardDescription>
+                        Join SmartGriev to report and track issues
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {error && (
+                            <div className="p-3 rounded-md bg-destructive/15 text-destructive text-sm flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4" />
+                                <span>{error}</span>
+                            </div>
+                        )}
+                        <div className="space-y-2">
+                            <Label htmlFor="full_name">Full Name</Label>
+                            <Input
+                                id="full_name"
+                                placeholder="John Doe"
+                                value={formData.full_name}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email address</Label>
+                            <Input
+                                id="email"
+                                type="email"
+                                placeholder="citizen@example.com"
+                                value={formData.email}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="role">Role (For Demo Purpose)</Label>
+                            <Select
+                                value={formData.role}
+                                onValueChange={(value) =>
+                                    setFormData((prev) => ({ ...prev, role: value as UserRole }))
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="citizen">Citizen</SelectItem>
+                                    <SelectItem value="officer">Officer</SelectItem>
+                                    <SelectItem value="admin">Admin</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="password">Password</Label>
+                            <Input
+                                id="password"
+                                type="password"
+                                placeholder="••••••••"
+                                value={formData.password}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="confirmPassword">Confirm Password</Label>
+                            <Input
+                                id="confirmPassword"
+                                type="password"
+                                placeholder="••••••••"
+                                value={formData.confirmPassword}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                        <Button className="w-full" type="submit" disabled={isLoading}>
+                            {isLoading ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Creating account...
+                                </>
+                            ) : (
+                                "Create account"
+                            )}
+                        </Button>
+                    </form>
+                </CardContent>
+                <CardFooter className="flex flex-col space-y-4 text-center text-sm text-gray-500">
+                    <p>
+                        Already have an account?{" "}
+                        <Link
+                            to="/login"
+                            className="font-semibold text-primary hover:text-primary/80 transition-colors"
+                        >
+                            Sign in
+                        </Link>
+                    </p>
+                    <div className="text-xs">
+                        <Link to="/" className="hover:text-gray-900 transition-colors">
+                            Back to Home
+                        </Link>{" "}
+                        •{" "}
+                        <Link to="/tracker" className="hover:text-gray-900 transition-colors">
+                            Public Tracker
+                        </Link>
+                    </div>
+                </CardFooter>
+            </Card>
         </div>
     );
-}
+};
+
+export default Register;

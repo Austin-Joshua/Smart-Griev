@@ -72,6 +72,7 @@ class GrievanceResponse(BaseModel):
     
     title: str
     description: str
+    image_url: Optional[str] = None
     
     category: GrievanceCategory
     urgency: GrievanceUrgency

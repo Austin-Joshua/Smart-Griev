@@ -302,7 +302,7 @@ class GrievanceService:
         description: str,
         comment: Optional[str] = None,
         is_visible_to_citizen: bool = True,
-        metadata: Optional[str] = None
+        event_metadata: Optional[str] = None
     ) -> Optional[TimelineEvent]:
         """
         Add timeline event to grievance.
@@ -316,7 +316,7 @@ class GrievanceService:
             description: Event description
             comment: Optional comment
             is_visible_to_citizen: Visibility flag
-            metadata: Optional metadata JSON
+            event_metadata: Optional metadata JSON
             
         Returns:
             Created TimelineEvent or None
@@ -330,7 +330,7 @@ class GrievanceService:
                 description=description,
                 comment=comment,
                 is_visible_to_citizen=is_visible_to_citizen,
-                metadata=metadata
+                event_metadata=event_metadata
             )
             
             db.add(event)
@@ -498,3 +498,36 @@ class GrievanceService:
         except Exception as e:
             logger.error(f"Error fetching attachments: {e}")
             return []
+    @staticmethod
+    def update_image_url(
+        db: Session,
+        grievance_id: str,
+        image_url: str
+    ) -> bool:
+        """
+        Update grievance image URL.
+        
+        Args:
+            db: Database session
+            grievance_id: Grievance ID
+            image_url: URL of the image
+            
+        Returns:
+            Success status
+        """
+        try:
+            grievance = db.query(Grievance).filter(
+                Grievance.id == UUID(grievance_id)
+            ).first()
+            
+            if not grievance:
+                return False
+            
+            grievance.image_url = image_url
+            db.commit()
+            return True
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error updating grievance image URL: {e}")
+            return False

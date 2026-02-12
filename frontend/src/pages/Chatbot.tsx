@@ -2,10 +2,10 @@ import { useState, useRef, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useGrievances } from "@/contexts/GrievanceContext";
+import { useGrievance } from "@/contexts/GrievanceContext";
 import { useNavigate } from "react-router-dom";
 import {
     Bot,
@@ -13,16 +13,21 @@ import {
     User,
     Sparkles,
     FileText,
-    ArrowRight,
-    MessageCircle,
 } from "lucide-react";
+import { GrievanceCategory, GrievanceUrgency } from "@/types";
 
 interface ChatMessage {
     id: number;
     role: "user" | "bot";
     content: string;
     timestamp: Date;
-    action?: { type: "submit_grievance"; title: string; description: string };
+    action?: {
+        type: "submit_grievance";
+        category: GrievanceCategory;
+        urgency: GrievanceUrgency;
+        description: string;
+        title?: string;
+    };
 }
 
 const quickActions = [
@@ -39,72 +44,79 @@ function generateBotResponse(userMessage: string): { content: string; action?: C
     const lower = userMessage.toLowerCase();
 
     // Check if user is describing a specific problem
-    if (lower.includes("water") || lower.includes("supply") || lower.includes("pipeline")) {
+    if (lower.includes("water") || lower.includes("supply") || lower.includes("pipeline") || lower.includes("leak")) {
         return {
-            content: "I understand you're facing a **water supply issue**. I've categorized this under the **Water Authority** department with **high priority**.\n\nWould you like me to submit this grievance for you? I'll include all the details you've provided.",
+            content: "I understand you're facing a **water supply issue**. I've categorized this under **Utilities** with **High Priority**.\n\nWould you like me to submit this grievance for you?",
             action: {
                 type: "submit_grievance",
-                title: "Water Supply Issue",
+                category: "Utilities",
+                urgency: "High",
                 description: userMessage,
+                title: "Water Supply Issue"
             },
         };
     }
 
-    if (lower.includes("pothole") || lower.includes("road") || lower.includes("traffic")) {
+    if (lower.includes("pothole") || lower.includes("road") || lower.includes("traffic") || lower.includes("street")) {
         return {
-            content: "I can see this is a **road/traffic issue**. This will be routed to the **Transport Authority** with **high priority** since it affects public safety.\n\nShall I file this grievance on your behalf?",
+            content: "I can see this is a **road/traffic issue**. This will be routed to **Transport** with **Medium Priority**.\n\nShall I file this grievance on your behalf?",
             action: {
                 type: "submit_grievance",
-                title: "Road Infrastructure Issue",
+                category: "Transport",
+                urgency: "Medium",
                 description: userMessage,
+                title: "Road Infrastructure Issue"
             },
         };
     }
 
-    if (lower.includes("garbage") || lower.includes("waste") || lower.includes("sanitation") || lower.includes("clean")) {
+    if (lower.includes("garbage") || lower.includes("waste") || lower.includes("sanitation") || lower.includes("clean") || lower.includes("trash")) {
         return {
-            content: "This looks like a **sanitation concern**. I'll route this to **Municipal Services** with **medium priority**.\n\nWant me to submit this grievance right away?",
+            content: "This looks like a **sanitation concern**. I'll route this to **Environment** with **Medium Priority**.\n\nWant me to submit this grievance right away?",
             action: {
                 type: "submit_grievance",
-                title: "Sanitation & Waste Management Issue",
+                category: "Environment",
+                urgency: "Medium",
                 description: userMessage,
+                title: "Sanitation & Waste Management"
             },
         };
     }
 
-    if (lower.includes("light") || lower.includes("electric") || lower.includes("power")) {
+    if (lower.includes("light") || lower.includes("electric") || lower.includes("power") || lower.includes("pole")) {
         return {
-            content: "I've identified this as an **infrastructure/electricity issue**. This will be handled by the **Public Works** department.\n\nShould I go ahead and submit this grievance?",
+            content: "I've identified this as an **infrastructure/electricity issue** (Civic). This will be handled by the **Public Works** department.\n\nShould I go ahead and submit this grievance?",
             action: {
                 type: "submit_grievance",
-                title: "Electricity/Lighting Issue",
+                category: "Civic",
+                urgency: "Medium",
                 description: userMessage,
+                title: "Electricity/Lighting Issue"
             },
         };
     }
 
     if (lower.includes("health") || lower.includes("hospital") || lower.includes("medical") || lower.includes("doctor")) {
         return {
-            content: "This is a **health-related concern** and will be marked as **high priority** for the **Health Department**.\n\nWould you like me to file this grievance immediately?",
+            content: "This is a **health-related concern** (Safety/Other) and will be marked as **High Priority**.\n\nWould you like me to file this grievance immediately?",
             action: {
                 type: "submit_grievance",
-                title: "Health & Medical Services Complaint",
+                category: "Safety",
+                urgency: "High",
                 description: userMessage,
+                title: "Health & Medical Services"
             },
         };
     }
 
     if (lower.includes("track") || lower.includes("status") || lower.includes("check")) {
         return {
-            content: "You can track all your submitted grievances on the **My Grievances** page. Each case has a unique ID and shows real-time status updates.\n\nWould you like me to take you to the dashboard?",
+            content: "You can track all your submitted grievances on the **Dashboard**. Each case has a unique ID and shows real-time status updates.\n\nWould you like me to take you to the dashboard?",
         };
     }
 
-    if (lower.includes("yes") || lower.includes("submit") || lower.includes("file") || lower.includes("go ahead")) {
-        return {
-            content: "I'll submit that grievance for you right now! ✅\n\nYou can track its progress on the **Citizen Dashboard**. You'll receive notifications when the status changes.",
-        };
-    }
+    // Simple confirmation detection could go here, but usually we need context. 
+    // For now, we rely on the specific action buttons generated above.
 
     if (lower.includes("hello") || lower.includes("hi") || lower.includes("hey")) {
         return {
@@ -131,7 +143,7 @@ export default function Chatbot() {
     const [isTyping, setIsTyping] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-    const { addGrievance } = useGrievances();
+    const { submitGrievance } = useGrievance(); // Fixed hook
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -165,25 +177,43 @@ export default function Chatbot() {
         };
         setMessages((prev) => [...prev, botMsg]);
         setIsTyping(false);
-        inputRef.current?.focus();
+        setTimeout(() => inputRef.current?.focus(), 100);
     };
 
-    const handleAction = (action: ChatMessage["action"]) => {
+    const handleAction = async (action: ChatMessage["action"]) => {
         if (!action) return;
 
         if (action.type === "submit_grievance") {
-            addGrievance({
-                title: action.title,
-                description: action.description,
-            });
+            try {
+                // Create FormData as expected by the context
+                const formData = new FormData();
+                formData.append("category", action.category);
+                formData.append("urgency", action.urgency);
+                formData.append("description", action.description);
+                // Can add a default location or prompt for it, leaving empty for now
 
-            const confirmMsg: ChatMessage = {
-                id: msgId++,
-                role: "bot",
-                content: "✅ **Grievance submitted successfully!** Your case has been filed and assigned to the appropriate department.\n\nYou can view and track it on your dashboard.",
-                timestamp: new Date(),
-            };
-            setMessages((prev) => [...prev, confirmMsg]);
+                setIsTyping(true);
+                await submitGrievance(formData); // Using correct context method
+
+                const confirmMsg: ChatMessage = {
+                    id: msgId++,
+                    role: "bot",
+                    content: "✅ **Grievance submitted successfully!** Your case has been filed and assigned to the appropriate department.\n\nYou can view and track it on your dashboard.",
+                    timestamp: new Date(),
+                };
+                setMessages((prev) => [...prev, confirmMsg]);
+            } catch (error) {
+                console.error("Chatbot submission error:", error);
+                const errorMsg: ChatMessage = {
+                    id: msgId++,
+                    role: "bot",
+                    content: "❌ **Submission failed.** I encountered an error while trying to submit your grievance. Please try again later or use the manual submission form.",
+                    timestamp: new Date(),
+                };
+                setMessages((prev) => [...prev, errorMsg]);
+            } finally {
+                setIsTyping(false);
+            }
         }
     };
 
@@ -254,17 +284,10 @@ export default function Chatbot() {
                                                     <Button
                                                         size="sm"
                                                         variant="hero"
-                                                        onClick={() => handleAction(msg.action)}
+                                                        onClick={() => handleAction(msg.action!)}
                                                     >
                                                         <FileText className="w-3 h-3" />
                                                         Submit Grievance
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => navigate("/dashboard")}
-                                                    >
-                                                        View Dashboard
                                                     </Button>
                                                 </div>
                                             )}

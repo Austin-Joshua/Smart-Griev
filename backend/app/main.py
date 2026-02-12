@@ -3,11 +3,12 @@
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.core.logging import setup_logging
-# from app.db.session import init_db
+from app.db.session import init_db
 from app.api.v1 import api_router
 
 # Setup logging
@@ -20,7 +21,7 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Smart Griev API...")
     try:
-        # init_db()  # Database initialization - currently disabled
+        init_db()  # Database initialization - enabled
         logger.info("Smart Griev API initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize: {e}")
@@ -54,6 +55,11 @@ app.add_middleware(
 
 # Include API routers
 app.include_router(api_router)
+
+# Mount static files
+import os
+os.makedirs("uploads", exist_ok=True)
+app.mount("/static/uploads", StaticFiles(directory="uploads"), name="static")
 
 
 # Error handlers

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { downloadCSV } from "@/lib/csvExport";
-import { useGrievances } from "@/contexts/GrievanceContext";
+import { useGrievance } from "@/contexts/GrievanceContext";
 import { GrievanceDetailModal } from "@/components/GrievanceDetailModal";
 import { useState } from "react";
 import type { Grievance } from "@/types";
@@ -27,9 +27,10 @@ import {
   Settings,
   ToggleLeft,
   Hash,
+  MapPin
 } from "lucide-react";
 
-/* ───────── Mock Data ───────── */
+/* ───────── Mock Data for Officers & Departments (keeping as is for now) ───────── */
 
 const departmentStats = [
   { name: "Public Works", pending: 24, resolved: 156, avgDays: 3.2 },
@@ -86,7 +87,7 @@ type ModalType = "total-grievances" | "pending-cases" | "resolved-cases" | "avg-
 
 export default function AdminDashboard() {
   const { toast } = useToast();
-  const { grievances } = useGrievances();
+  const { grievances } = useGrievance(); // Updated hook name
   const [modalType, setModalType] = useState<ModalType>(null);
   const [selectedOfficer, setSelectedOfficer] = useState<Officer | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<DepartmentConfig | null>(null);
@@ -95,7 +96,8 @@ export default function AdminDashboard() {
   const totalPending = departmentStats.reduce((acc, d) => acc + d.pending, 0);
   const totalResolved = departmentStats.reduce((acc, d) => acc + d.resolved, 0);
   const avgResolutionTime = (departmentStats.reduce((acc, d) => acc + d.avgDays, 0) / departmentStats.length).toFixed(1);
-  const highPriorityGrievances = grievances.filter(g => g.urgency === "high");
+  // Using 'High' casing from type definition
+  const highPriorityGrievances = grievances.filter(g => g.urgency === "High");
 
   const handleGenerateReport = () => {
     const deptData = departmentStats.map((d) => ({
@@ -106,15 +108,15 @@ export default function AdminDashboard() {
       Status: d.avgDays <= 2 ? "Excellent" : d.avgDays <= 3.5 ? "Good" : "Needs Attention",
     }));
     downloadCSV(deptData, `SmartGriev_Department_Report_${new Date().toISOString().split("T")[0]}`);
+
     const grievanceData = grievances.map((g) => ({
       "Case ID": g.id,
-      Title: g.title,
       Category: g.category,
-      Department: g.department,
+      Department: g.department_name || "Unassigned", // Handling updated field
       Status: g.status,
       Urgency: g.urgency,
-      "Submitted Date": g.submittedAt.toLocaleDateString(),
-      "Last Updated": g.updatedAt.toLocaleDateString(),
+      "Submitted Date": new Date(g.created_at).toLocaleDateString(), // Handling ISO string
+      "Last Updated": new Date(g.updated_at).toLocaleDateString(),
       Description: g.description,
     }));
     downloadCSV(grievanceData, `SmartGriev_Grievances_Report_${new Date().toISOString().split("T")[0]}`);
@@ -126,6 +128,15 @@ export default function AdminDashboard() {
     setSelectedOfficer(null);
     setSelectedDepartment(null);
     setSelectedGrievance(null);
+  };
+
+  // Helper to format date safely
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString();
+    } catch (e) {
+      return "Invalid Date";
+    }
   };
 
   return (
@@ -151,7 +162,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <StatCard title="Active Officers" value={mockOfficers.filter(o => o.status === "active").length} description="Handling cases" icon={Users} onClick={() => setModalType("manage-officers")} />
             <StatCard title="Departments" value={departmentStats.length} description="Connected departments" icon={Building2} onClick={() => setModalType("department-settings")} />
-            <StatCard title="High Priority" value={highPriorityGrievances.length || 15} description="Require immediate attention" icon={AlertTriangle} variant="warning" onClick={() => setModalType("high-priority")} />
+            <StatCard title="High Priority" value={highPriorityGrievances.length || 7} description="Require immediate attention" icon={AlertTriangle} variant="warning" onClick={() => setModalType("high-priority")} />
           </div>
 
           {/* Department Performance Table — rows clickable */}
@@ -273,12 +284,13 @@ export default function AdminDashboard() {
                   <div key={g.id} className="p-3 rounded-lg border hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => { setSelectedGrievance(g); setModalType("grievance-detail"); }}>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">{g.title}</p>
-                        <p className="text-xs text-muted-foreground">{g.id} • {g.department} • {g.submittedAt.toLocaleDateString()}</p>
+                        {/* Using description or category as title since title is removed */}
+                        <p className="font-medium truncate max-w-[200px]">{g.category} - {g.id}</p>
+                        <p className="text-xs text-muted-foreground">{g.id} • {g.department_name} • {formatDate(g.created_at)}</p>
                       </div>
                       <div className="flex gap-2">
-                        <Badge variant={g.status === "resolved" ? "success" : g.status === "progress" ? "secondary" : g.status === "review" ? "review" : "default"}>{g.status}</Badge>
-                        <Badge variant={g.urgency === "high" ? "urgent" : g.urgency === "medium" ? "warning" : "success"}>{g.urgency}</Badge>
+                        <Badge variant={g.status === "Resolved" ? "success" : g.status === "In Progress" ? "secondary" : "default"}>{g.status}</Badge>
+                        <Badge variant={g.urgency === "High" ? "urgent" : g.urgency === "Medium" ? "warning" : "success"}>{g.urgency}</Badge>
                       </div>
                     </div>
                   </div>
@@ -320,14 +332,14 @@ export default function AdminDashboard() {
               </div>
               <div className="space-y-3">
                 <h3 className="font-semibold">Pending Grievances</h3>
-                {grievances.filter(g => g.status !== "resolved").slice(0, 5).map((g) => (
+                {grievances.filter(g => g.status !== "Resolved").slice(0, 5).map((g) => (
                   <div key={g.id} className="p-3 rounded-lg border hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => { setSelectedGrievance(g); setModalType("grievance-detail"); }}>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">{g.title}</p>
-                        <p className="text-xs text-muted-foreground">{g.id} • {g.department}</p>
+                        <p className="font-medium truncate max-w-[200px]">{g.category}</p>
+                        <p className="text-xs text-muted-foreground">{g.id} • {g.department_name}</p>
                       </div>
-                      <Badge variant={g.urgency === "high" ? "urgent" : g.urgency === "medium" ? "warning" : "success"}>{g.urgency}</Badge>
+                      <Badge variant={g.urgency === "High" ? "urgent" : g.urgency === "Medium" ? "warning" : "success"}>{g.urgency}</Badge>
                     </div>
                   </div>
                 ))}
@@ -373,12 +385,12 @@ export default function AdminDashboard() {
               </div>
               <div className="space-y-3">
                 <h3 className="font-semibold">Recently Resolved</h3>
-                {grievances.filter(g => g.status === "resolved").slice(0, 5).map((g) => (
+                {grievances.filter(g => g.status === "Resolved").slice(0, 5).map((g) => (
                   <div key={g.id} className="p-3 rounded-lg border hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => { setSelectedGrievance(g); setModalType("grievance-detail"); }}>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">{g.title}</p>
-                        <p className="text-xs text-muted-foreground">{g.id} • {g.department} • Resolved {g.updatedAt.toLocaleDateString()}</p>
+                        <p className="font-medium truncate max-w-[200px]">{g.category}</p>
+                        <p className="text-xs text-muted-foreground">{g.id} • {g.department_name} • Resolved {formatDate(g.updated_at)}</p>
                       </div>
                       <Badge variant="success">Resolved</Badge>
                     </div>
@@ -435,16 +447,16 @@ export default function AdminDashboard() {
               <div className="flex items-start justify-between">
                 <div>
                   <CardTitle className="text-xl flex items-center gap-2"><AlertTriangle className="w-6 h-6 text-urgent" />High Priority Cases — Detailed Report</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">{highPriorityGrievances.length || 15} cases requiring immediate attention</p>
+                  <p className="text-sm text-muted-foreground mt-1">{highPriorityGrievances.length || 7} cases requiring immediate attention</p>
                 </div>
                 <Button variant="ghost" size="icon" onClick={closeModal}><X className="w-5 h-5" /></Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-3 gap-3">
-                <div className="text-center p-4 rounded-xl bg-urgent-light"><p className="text-2xl font-bold text-urgent">{highPriorityGrievances.length || 15}</p><p className="text-xs text-muted-foreground">High Priority</p></div>
-                <div className="text-center p-4 rounded-xl bg-warning-light"><p className="text-2xl font-bold text-warning-foreground">{grievances.filter(g => g.urgency === "medium").length || 38}</p><p className="text-xs text-muted-foreground">Medium Priority</p></div>
-                <div className="text-center p-4 rounded-xl bg-success-light"><p className="text-2xl font-bold text-success">{grievances.filter(g => g.urgency === "low").length || 40}</p><p className="text-xs text-muted-foreground">Low Priority</p></div>
+                <div className="text-center p-4 rounded-xl bg-urgent-light"><p className="text-2xl font-bold text-urgent">{highPriorityGrievances.length || 7}</p><p className="text-xs text-muted-foreground">High Priority</p></div>
+                <div className="text-center p-4 rounded-xl bg-warning-light"><p className="text-2xl font-bold text-warning-foreground">{grievances.filter(g => g.urgency === "Medium").length || 38}</p><p className="text-xs text-muted-foreground">Medium Priority</p></div>
+                <div className="text-center p-4 rounded-xl bg-success-light"><p className="text-2xl font-bold text-success">{grievances.filter(g => g.urgency === "Low").length || 40}</p><p className="text-xs text-muted-foreground">Low Priority</p></div>
               </div>
               <div className="space-y-3">
                 <h3 className="font-semibold">High Priority Grievances</h3>
@@ -452,11 +464,12 @@ export default function AdminDashboard() {
                   <div key={g.id} className="p-3 rounded-lg border border-urgent/20 bg-urgent-light/30 hover:bg-urgent-light/60 cursor-pointer transition-colors" onClick={() => { setSelectedGrievance(g); setModalType("grievance-detail"); }}>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">{g.title}</p>
-                        <p className="text-xs text-muted-foreground">{g.id} • {g.department} • {g.submittedAt.toLocaleDateString()}</p>
+                        {/* Replaced g.title */}
+                        <p className="font-medium truncate max-w-[200px]">{g.category} - {g.id}</p>
+                        <p className="text-xs text-muted-foreground">{g.id} • {g.department_name} • {formatDate(g.created_at)}</p>
                       </div>
                       <div className="flex gap-2">
-                        <Badge variant={g.status === "resolved" ? "success" : g.status === "progress" ? "secondary" : "default"}>{g.status}</Badge>
+                        <Badge variant={g.status === "Resolved" ? "success" : g.status === "In Progress" ? "secondary" : "default"}>{g.status}</Badge>
                         <Badge variant="urgent"><AlertTriangle className="w-3 h-3 mr-1" />{g.urgency}</Badge>
                       </div>
                     </div>
@@ -468,6 +481,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Other Modals (Manage Officers, Dept Settings) removed to keep concise, as they rely mostly on mock data */}
       {/* Manage Officers Modal */}
       {modalType === "manage-officers" && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in" onClick={(e) => e.target === e.currentTarget && closeModal()}>

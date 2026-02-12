@@ -50,7 +50,7 @@ class TimelineEvent(Base):
     
     description = Column(String(255), nullable=False)
     comment = Column(Text, nullable=True)
-    metadata = Column(Text, nullable=True)  # JSON string for extensibility
+    event_metadata = Column(Text, nullable=True)  # JSON string for extensibility
     
     is_visible_to_citizen = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)

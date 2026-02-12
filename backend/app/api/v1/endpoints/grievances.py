@@ -1,7 +1,7 @@
 """Grievance management endpoints"""
 
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Form
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -26,31 +26,33 @@ ai_service = AIService()
 
 @router.post("/submit", response_model=dict)
 async def submit_grievance(
-    grievance_data: GrievanceCreate,
+    title: str = Form(...),
+    description: str = Form(...),
+    category: Optional[str] = Form(None),
+    urgency: Optional[str] = Form(None),
+    location: Optional[str] = Form(None),
+    file: Optional[UploadFile] = File(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Submit a new grievance.
-    
-    **Workflow:**
-    1. Validate input
-    2. Run AI analysis
-    3. Check for duplicates
-    4. Route to department
-    5. Create grievance record
-    6. Send notification
-    
-    Returns grievance ID and initial status.
+    Submit a new grievance with optional file attachment.
     """
     logger.info(f"Grievance submission started by citizen {current_user.id}")
     
     # Validate grievance length
-    if len(grievance_data.description) > 5000:
+    if len(description) > 5000:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Grievance description too long (max 5000 characters)"
         )
+
+    # Prepare grievance data object
+    grievance_data = GrievanceCreate(
+        title=title if title else "Grievance Report", # Fallback title if not provided
+        description=description,
+        category=None # Will be determined by AI
+    )
     
     # Get existing grievances for duplicate detection
     existing_grievances = db.query(Grievance).filter(
@@ -68,15 +70,22 @@ async def submit_grievance(
     
     # Run AI analysis
     ai_analysis = ai_service.analyze_grievance(
-        grievance_data.description,
+        description,
         existing_docs
     )
+    
+    # Override category/urgency if provided by user, otherwise use AI result
+    if category:
+        ai_analysis["category"] = category
+    if urgency:
+        ai_analysis["urgency"] = urgency
+        
     logger.info(f"AI analysis complete: {ai_analysis}")
     
     # Route to department
     routing_result = RoutingService.route_grievance(
         db,
-        grievance_id="temp",  # Will be updated after creation
+        grievance_id="temp",
         category=ai_analysis["category"],
         priority_score=ai_analysis["priority_score"],
         is_duplicate=ai_analysis["is_duplicate"]
@@ -103,6 +112,29 @@ async def submit_grievance(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create grievance"
         )
+        
+    # Handle File Upload
+    if file:
+        from app.services.file_service import FileService
+        upload_result = FileService.save_upload(file)
+        
+        if upload_result["success"]:
+            GrievanceService.add_attachment(
+                db=db,
+                grievance_id=str(grievance.id),
+                file_name=upload_result["file_name"],
+                file_size=upload_result["file_size"],
+                file_type=upload_result["file_type"],
+                file_url=upload_result["file_url"],
+                uploaded_by=str(current_user.id)
+            )
+            # Update grievance with image_url if it's an image
+            if upload_result["file_type"].startswith("image/"):
+                GrievanceService.update_image_url(
+                    db=db,
+                    grievance_id=str(grievance.id),
+                    image_url=upload_result["file_url"]
+                )
     
     # Send notification
     NotificationService.notify_grievance_submitted(

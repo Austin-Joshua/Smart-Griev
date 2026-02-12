@@ -1,114 +1,99 @@
-import { createContext, useContext, useState, ReactNode, useCallback } from "react";
-import type { Grievance } from "@/types";
+import React, { createContext, useContext, useState, ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Grievance, GrievanceStatus } from "@/types";
+import { grievanceService, GrievanceFilters } from "@/services/grievance.service";
+import { useAuth } from "@/contexts/AuthContext";
+// import { toast } from "sonner"; // Assuming toast is available or can be added
 
 interface GrievanceContextType {
     grievances: Grievance[];
-    addGrievance: (g: Omit<Grievance, "id" | "status" | "submittedAt" | "updatedAt" | "department" | "category" | "urgency">) => Grievance;
+    isLoading: boolean;
+    refreshGrievances: () => Promise<void>;
+    submitGrievance: (data: FormData) => Promise<any>;
+    updateStatus: (id: string, status: GrievanceStatus, comment?: string) => Promise<void>;
+    filters: GrievanceFilters;
+    setFilters: (filters: GrievanceFilters) => void;
+    getGrievanceById: (id: string) => Promise<Grievance | undefined>;
 }
 
 const GrievanceContext = createContext<GrievanceContextType | undefined>(undefined);
 
-// AI mock: assigns category, department, urgency based on keywords
-function analyzeGrievance(text: string): { category: string; department: string; urgency: "low" | "medium" | "high" } {
-    const lower = text.toLowerCase();
-    if (lower.includes("water") || lower.includes("supply") || lower.includes("pipeline")) {
-        return { category: "Utilities", department: "Water Authority", urgency: "high" };
-    }
-    if (lower.includes("road") || lower.includes("pothole") || lower.includes("traffic")) {
-        return { category: "Roads", department: "Transport Authority", urgency: "high" };
-    }
-    if (lower.includes("garbage") || lower.includes("waste") || lower.includes("sanitation")) {
-        return { category: "Sanitation", department: "Municipal Services", urgency: "medium" };
-    }
-    if (lower.includes("light") || lower.includes("electricity") || lower.includes("power")) {
-        return { category: "Infrastructure", department: "Public Works", urgency: "medium" };
-    }
-    if (lower.includes("health") || lower.includes("hospital") || lower.includes("medical")) {
-        return { category: "Health", department: "Health Department", urgency: "high" };
-    }
-    if (lower.includes("park") || lower.includes("garden") || lower.includes("tree")) {
-        return { category: "Environment", department: "Municipal Services", urgency: "low" };
-    }
-    return { category: "General", department: "Central Administration", urgency: "medium" };
-}
+export const GrievanceProvider = ({ children }: { children: ReactNode }) => {
+    const { user } = useAuth();
+    const [filters, setFilters] = useState<GrievanceFilters>({});
+    const queryClient = useQueryClient();
 
-const initialGrievances: Grievance[] = [
-    {
-        id: "GRV-2024-001234",
-        title: "Street Light Not Working on Main Road",
-        description: "The street light near the intersection of Main Road and Park Avenue has been non-functional for the past two weeks, creating safety concerns for pedestrians.",
-        category: "Infrastructure",
-        department: "Public Works",
-        status: "progress",
-        urgency: "medium",
-        submittedAt: new Date("2024-01-15"),
-        updatedAt: new Date("2024-01-18"),
-    },
-    {
-        id: "GRV-2024-001230",
-        title: "Water Supply Interruption",
-        description: "Frequent water supply interruptions in the morning hours affecting daily routines. This has been ongoing for the past week.",
-        category: "Utilities",
-        department: "Water Authority",
-        status: "review",
-        urgency: "high",
-        submittedAt: new Date("2024-01-14"),
-        updatedAt: new Date("2024-01-15"),
-    },
-    {
-        id: "GRV-2024-001225",
-        title: "Garbage Collection Delay",
-        description: "Regular garbage collection has not occurred in our neighborhood for the past three days. Waste is accumulating and causing hygiene issues.",
-        category: "Sanitation",
-        department: "Municipal Services",
-        status: "resolved",
-        urgency: "medium",
-        submittedAt: new Date("2024-01-10"),
-        updatedAt: new Date("2024-01-13"),
-    },
-    {
-        id: "GRV-2024-001220",
-        title: "Pothole on School Route",
-        description: "Large pothole has developed on the road leading to the primary school. It's dangerous for children walking to school.",
-        category: "Roads",
-        department: "Transport Authority",
-        status: "submitted",
-        urgency: "high",
-        submittedAt: new Date("2024-01-12"),
-        updatedAt: new Date("2024-01-12"),
-    },
-];
+    // Use React Query for fetching with polling
+    const { data, isLoading, refetch } = useQuery({
+        queryKey: ['grievances', user?.id, filters],
+        queryFn: async () => {
+            if (!user) return { items: [], total: 0 };
+            return await grievanceService.getAll(filters);
+        },
+        enabled: !!user,
+        refetchInterval: 30000, // Poll every 30 seconds
+    });
 
-let nextId = 1235;
+    const grievances = data?.items || [];
 
-export function GrievanceProvider({ children }: { children: ReactNode }) {
-    const [grievances, setGrievances] = useState<Grievance[]>(initialGrievances);
+    const refreshGrievances = async () => {
+        await refetch();
+    };
 
-    const addGrievance = useCallback((data: Omit<Grievance, "id" | "status" | "submittedAt" | "updatedAt" | "department" | "category" | "urgency">): Grievance => {
-        const analysis = analyzeGrievance(`${data.title} ${data.description}`);
-        const now = new Date();
-        const id = `GRV-2024-${String(nextId++).padStart(6, "0")}`;
-        const newGrievance: Grievance = {
-            ...data,
-            id,
-            status: "submitted",
-            submittedAt: now,
-            updatedAt: now,
-            ...analysis,
-        };
-        setGrievances((prev) => [newGrievance, ...prev]);
-        return newGrievance;
-    }, []);
+    const submitGrievance = async (data: FormData) => {
+        try {
+            const response = await grievanceService.create(data);
+            await queryClient.invalidateQueries({ queryKey: ['grievances'] });
+            return response;
+        } catch (error) {
+            console.error("Failed to submit grievance", error);
+            throw error;
+        }
+    };
+
+    const updateStatus = async (id: string, status: GrievanceStatus, comment?: string) => {
+        try {
+            await grievanceService.updateStatus(id, status, comment);
+            await queryClient.invalidateQueries({ queryKey: ['grievances'] });
+        } catch (error) {
+            console.error("Failed to update status", error);
+            throw error;
+        }
+    };
+
+    const getGrievanceById = async (id: string): Promise<Grievance | undefined> => {
+        // Check if we have it in state, otherwise fetch
+        const existing = grievances.find(g => g.id === id);
+        if (existing) return existing;
+
+        try {
+            return await grievanceService.getById(id);
+        } catch (error) {
+            console.error("Failed to fetch grievance by ID", error);
+            return undefined;
+        }
+    }
 
     return (
-        <GrievanceContext.Provider value={{ grievances, addGrievance }}>
+        <GrievanceContext.Provider value={{
+            grievances,
+            isLoading,
+            refreshGrievances,
+            submitGrievance,
+            updateStatus,
+            filters,
+            setFilters,
+            getGrievanceById
+        }}>
             {children}
         </GrievanceContext.Provider>
     );
-}
+};
 
-export function useGrievances() {
+export const useGrievance = () => {
     const context = useContext(GrievanceContext);
-    if (!context) throw new Error("useGrievances must be used within GrievanceProvider");
+    if (!context) {
+        throw new Error("useGrievance must be used within GrievanceProvider");
+    }
     return context;
-}
+};

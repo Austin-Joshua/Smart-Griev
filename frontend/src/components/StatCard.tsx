@@ -11,7 +11,7 @@ interface StatCardProps {
     value: number;
     positive: boolean;
   };
-  variant?: "default" | "primary" | "secondary" | "success" | "warning";
+  variant?: "default" | "primary" | "secondary" | "success" | "warning" | "urgent";
   onClick?: () => void;
 }
 
@@ -21,6 +21,7 @@ const variantStyles = {
   secondary: "bg-secondary-light border-secondary/20",
   success: "bg-success-light border-success/20",
   warning: "bg-warning-light border-warning/20",
+  urgent: "bg-urgent-light border-urgent/20",
 };
 
 const iconVariantStyles = {
@@ -29,6 +30,7 @@ const iconVariantStyles = {
   secondary: "bg-secondary/10 text-secondary",
   success: "bg-success/10 text-success",
   warning: "bg-warning/10 text-warning",
+  urgent: "bg-urgent/10 text-urgent",
 };
 
 export function StatCard({
