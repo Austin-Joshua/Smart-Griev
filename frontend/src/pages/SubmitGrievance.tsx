@@ -9,19 +9,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CheckCircle2, Send, Shield, Clock, Brain } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useGrievances } from "@/contexts/GrievanceContext";
 
 export default function SubmitGrievance() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [grievance, setGrievance] = useState("");
+  const [title, setTitle] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [lastSubmittedId, setLastSubmittedId] = useState("");
+  const [lastCategory, setLastCategory] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { addGrievance } = useGrievances();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!grievance.trim()) {
       toast({
         title: "Please describe your grievance",
@@ -32,10 +37,20 @@ export default function SubmitGrievance() {
     }
 
     setIsSubmitting(true);
-    
+
     // Simulate AI processing
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    
+
+    // Add to shared grievance context
+    const newGrievance = addGrievance({
+      title: title.trim() || grievance.trim().slice(0, 60) + (grievance.length > 60 ? "..." : ""),
+      description: grievance.trim(),
+      citizenName: name || undefined,
+      citizenEmail: email || undefined,
+    });
+
+    setLastSubmittedId(newGrievance.id);
+    setLastCategory(newGrievance.category);
     setIsSubmitting(false);
     setSubmitted(true);
   };
@@ -51,7 +66,7 @@ export default function SubmitGrievance() {
                 <div className="w-20 h-20 rounded-full bg-success-light flex items-center justify-center mx-auto">
                   <CheckCircle2 className="w-10 h-10 text-success" />
                 </div>
-                
+
                 <div className="space-y-2">
                   <h1 className="font-heading text-2xl md:text-3xl font-bold">
                     Your Grievance Has Been Submitted
@@ -66,7 +81,7 @@ export default function SubmitGrievance() {
                     <Brain className="w-5 h-5 text-primary" />
                     <div>
                       <p className="font-medium">AI Analysis Complete</p>
-                      <p className="text-sm text-muted-foreground">Category: Infrastructure & Public Works</p>
+                      <p className="text-sm text-muted-foreground">Category: {lastCategory}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -79,7 +94,7 @@ export default function SubmitGrievance() {
                   <div className="flex items-center gap-3">
                     <Shield className="w-5 h-5 text-success" />
                     <div>
-                      <p className="font-medium">Case ID: GRV-2024-001234</p>
+                      <p className="font-medium">Case ID: {lastSubmittedId}</p>
                       <p className="text-sm text-muted-foreground">Use this to track your case</p>
                     </div>
                   </div>
@@ -92,6 +107,7 @@ export default function SubmitGrievance() {
                   <Button variant="outline" onClick={() => {
                     setSubmitted(false);
                     setGrievance("");
+                    setTitle("");
                     setName("");
                     setEmail("");
                   }}>
@@ -110,7 +126,7 @@ export default function SubmitGrievance() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      
+
       <main className="flex-1 container py-12">
         <div className="max-w-2xl mx-auto space-y-8">
           <div className="text-center space-y-3">
@@ -154,6 +170,16 @@ export default function SubmitGrievance() {
                       onChange={(e) => setEmail(e.target.value)}
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="title">Title / Subject</Label>
+                  <Input
+                    id="title"
+                    placeholder="Brief summary of your concern"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-2">
